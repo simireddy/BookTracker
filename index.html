@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Reading Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -592,7 +591,11 @@
                         <input type="text" id="supabaseUrl" placeholder="Supabase URL (https://xxxxx.supabase.co)" class="input text-sm">
                         <input type="text" id="supabaseKey" placeholder="Supabase Anon Key" class="input text-sm">
                         <input type="text" id="userId" placeholder="Your Unique User ID (e.g., your email or name)" class="input text-sm">
-                        <button onclick="saveSupabaseConfig()" class="btn btn-primary" style="width: fit-content;">Save & Connect</button>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button onclick="testConnection()" class="btn" style="background: #60a5fa; color: white; width: fit-content;">Test Connection</button>
+                            <button onclick="saveSupabaseConfig()" class="btn btn-primary" style="width: fit-content;">Save & Connect</button>
+                        </div>
+                        <div id="connectionStatus" style="display: none; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.875rem;"></div>
                     </div>
                 </div>
             </div>
@@ -663,21 +666,16 @@
     </div>
 
     <script>
-        // Supabase configuration
-        let supabase = null;
+        // Supabase configuration (using REST API directly)
+        let supabaseUrl = localStorage.getItem('readingDashboard_supabaseUrl') || '';
+        let supabaseKey = localStorage.getItem('readingDashboard_supabaseKey') || '';
         let userId = localStorage.getItem('readingDashboard_userId') || '';
         
-        // Initialize Supabase if credentials exist
-        const storedUrl = localStorage.getItem('readingDashboard_supabaseUrl');
-        const storedKey = localStorage.getItem('readingDashboard_supabaseKey');
-        
-        if (storedUrl && storedKey && userId) {
-            try {
-                supabase = window.supabase.createClient(storedUrl, storedKey);
+        // Hide setup banner if configured
+        if (supabaseUrl && supabaseKey && userId) {
+            document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('setupBanner').style.display = 'none';
-            } catch (e) {
-                console.error('Supabase init error:', e);
-            }
+            });
         }
 
         // Load data from localStorage or use defaults
@@ -692,6 +690,64 @@
         let activeTab = null;
         let isSyncing = false;
 
+        // Test Supabase connection using REST API
+        async function testConnection() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            const statusDiv = document.getElementById('connectionStatus');
+
+            if (!url || !key) {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#fee2e2';
+                statusDiv.style.color = '#991b1b';
+                statusDiv.textContent = '❌ Please enter both URL and API Key';
+                return;
+            }
+
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#dbeafe';
+            statusDiv.style.color = '#1e40af';
+            statusDiv.textContent = '⏳ Testing connection...';
+
+            try {
+                console.log('Testing connection to:', url);
+                
+                const response = await fetch(`${url}/rest/v1/reading_data?select=user_id&limit=1`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': key,
+                        'Authorization': `Bearer ${key}`,
+                        'Content-Type': 'application/json'
+                    },
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+
+                console.log('Test response status:', response.status);
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${error}`);
+                }
+
+                statusDiv.style.background = '#d1fae5';
+                statusDiv.style.color = '#065f46';
+                statusDiv.innerHTML = '✅ Connection successful! Table found. You can now save the configuration.<br><br><strong>Note:</strong> If sync still fails, you may need to deploy this to GitHub Pages instead of using it in Claude.';
+            } catch (e) {
+                console.error('Test connection error:', e);
+                statusDiv.style.background = '#fee2e2';
+                statusDiv.style.color = '#991b1b';
+                statusDiv.innerHTML = `❌ Connection failed: ${e.message}<br><br>
+                <strong>This might be because you're using Claude's iframe.</strong><br><br>
+                Solutions:<br>
+                • Deploy to GitHub Pages (recommended)<br>
+                • Make sure you ran the SQL to create the table<br>
+                • Check that URL has no trailing slash<br>
+                • Use the anon/public key (not service_role)<br>
+                • Verify RLS policies are set correctly`;
+            }
+        }
+
         // Save Supabase configuration
         function saveSupabaseConfig() {
             const url = document.getElementById('supabaseUrl').value.trim();
@@ -703,83 +759,131 @@
                 return;
             }
 
-            try {
-                supabase = window.supabase.createClient(url, key);
-                userId = user;
-                
-                localStorage.setItem('readingDashboard_supabaseUrl', url);
-                localStorage.setItem('readingDashboard_supabaseKey', key);
-                localStorage.setItem('readingDashboard_userId', user);
-                
-                document.getElementById('setupBanner').style.display = 'none';
-                
-                // Initial sync
-                syncNow();
-            } catch (e) {
-                alert('Error connecting to Supabase: ' + e.message);
-            }
+            supabaseUrl = url;
+            supabaseKey = key;
+            userId = user;
+            
+            localStorage.setItem('readingDashboard_supabaseUrl', url);
+            localStorage.setItem('readingDashboard_supabaseKey', key);
+            localStorage.setItem('readingDashboard_userId', user);
+            
+            document.getElementById('setupBanner').style.display = 'none';
+            
+            // Initial sync
+            syncNow();
         }
 
-        // Sync data to Supabase
+        // Sync data to Supabase using REST API
         async function syncToCloud() {
-            if (!supabase || !userId || isSyncing) return;
+            if (!supabaseUrl || !supabaseKey || !userId || isSyncing) return;
             
             try {
-                const { data, error } = await supabase
-                    .from('reading_data')
-                    .upsert({
-                        user_id: userId,
-                        books: books,
-                        read_dates: [...readDates],
-                        updated_at: new Date().toISOString()
-                    }, {
-                        onConflict: 'user_id'
-                    });
+                console.log('Syncing to cloud...');
+                console.log('URL:', supabaseUrl);
+                console.log('User ID:', userId);
+                console.log('Books count:', books.length);
+                console.log('Dates count:', readDates.size);
+                
+                const payload = {
+                    user_id: userId,
+                    books: books,
+                    read_dates: [...readDates],
+                    updated_at: new Date().toISOString()
+                };
 
-                if (error) throw error;
+                console.log('Payload preview:', JSON.stringify(payload).substring(0, 200) + '...');
+
+                const response = await fetch(`${supabaseUrl}/rest/v1/reading_data`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    mode: 'cors',
+                    credentials: 'omit',
+                    body: JSON.stringify(payload)
+                });
+
+                console.log('Upload response status:', response.status);
+                console.log('Upload response ok?', response.ok);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Upload error response:', errorText);
+                    throw new Error(`Upload failed (${response.status}): ${errorText}`);
+                }
+                
+                console.log('Sync to cloud successful');
                 return true;
             } catch (e) {
-                console.error('Sync to cloud error:', e);
+                console.error('Error name:', e.name);
+                console.error('Error message:', e.message);
+                if (e.stack) console.error('Error stack:', e.stack);
+                alert('Upload failed: ' + e.message + '\n\nCheck:\n• Your internet connection\n• Supabase URL is correct\n• API key is valid\n• RLS policies allow access');
                 return false;
             }
         }
 
-        // Load data from Supabase
+        // Load data from Supabase using REST API
         async function syncFromCloud() {
-            if (!supabase || !userId || isSyncing) return;
+            if (!supabaseUrl || !supabaseKey || !userId || isSyncing) return;
             
             try {
-                const { data, error } = await supabase
-                    .from('reading_data')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .single();
+                console.log('Fetching from cloud...');
+                console.log('URL:', supabaseUrl);
+                console.log('User ID:', userId);
+                console.log('Full fetch URL:', `${supabaseUrl}/rest/v1/reading_data?user_id=eq.${encodeURIComponent(userId)}&select=*`);
+                
+                const response = await fetch(`${supabaseUrl}/rest/v1/reading_data?user_id=eq.${encodeURIComponent(userId)}&select=*`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
 
-                if (error) {
-                    if (error.code === 'PGRST116') {
-                        // No data found, sync current data to cloud
-                        await syncToCloud();
-                        return true;
-                    }
-                    throw error;
+                console.log('Response status:', response.status);
+                console.log('Response ok?', response.ok);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Response error:', errorText);
+                    throw new Error(`Fetch failed (${response.status}): ${errorText}`);
                 }
 
-                if (data) {
-                    books = data.books || books;
-                    readDates = new Set(data.read_dates || []);
+                const data = await response.json();
+                console.log('Data received, length:', data ? data.length : 'null');
+
+                if (data && data.length > 0) {
+                    console.log('Data loaded from cloud successfully');
+                    books = data[0].books || books;
+                    readDates = new Set(data[0].read_dates || []);
                     saveDataLocally();
                     renderAll();
                     return true;
+                } else {
+                    // No data exists yet, create initial record
+                    console.log('No data found, creating initial record...');
+                    await syncToCloud();
+                    return true;
                 }
             } catch (e) {
-                console.error('Sync from cloud error:', e);
+                console.error('Error name:', e.name);
+                console.error('Error message:', e.message);
+                if (e.stack) console.error('Error stack:', e.stack);
+                alert('Sync failed: ' + e.message + '\n\nCheck:\n• Your internet connection\n• Supabase URL is correct\n• API key is valid\n• RLS policies allow access');
                 return false;
             }
         }
 
         // Manual sync button
         async function syncNow() {
-            if (!supabase || !userId) {
+            if (!supabaseUrl || !supabaseKey || !userId) {
                 alert('Please configure Supabase first');
                 return;
             }
@@ -792,12 +896,12 @@
             syncBtn.textContent = 'Syncing...';
 
             try {
-                // First, get cloud data
-                const cloudSuccess = await syncFromCloud();
+                // First push local changes to cloud
+                const uploadSuccess = await syncToCloud();
                 
-                // Then push local changes
-                if (cloudSuccess) {
-                    await syncToCloud();
+                if (uploadSuccess) {
+                    // Then get latest from cloud
+                    await syncFromCloud();
                     syncBtn.textContent = 'Synced ✓';
                     setTimeout(() => {
                         syncBtn.textContent = originalText;
@@ -809,6 +913,7 @@
                     }, 2000);
                 }
             } catch (e) {
+                console.error('Manual sync error:', e);
                 syncBtn.textContent = 'Sync Failed';
                 setTimeout(() => {
                     syncBtn.textContent = originalText;
@@ -821,7 +926,7 @@
         // Auto-sync when data changes
         async function saveData() {
             saveDataLocally();
-            if (supabase && userId) {
+            if (supabaseUrl && supabaseKey && userId) {
                 await syncToCloud();
             }
         }
@@ -833,8 +938,10 @@
         }
 
         // Load from cloud on page load
-        if (supabase && userId) {
-            syncFromCloud();
+        if (supabaseUrl && supabaseKey && userId) {
+            window.addEventListener('load', () => {
+                syncFromCloud();
+            });
         }
 
         function toggleAddForm() {
