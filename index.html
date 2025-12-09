@@ -1,761 +1,412 @@
-import React, { useState, useMemo } from 'react';
-import { BookOpen, Plus, Trash2, Calendar, TrendingUp } from 'lucide-react';
-
-const BookDashboard = () => {
-  const [books, setBooks] = useState([
-    {
-      id: 1,
-      title: "The Midnight Library",
-      author: "Matt Haig",
-      status: "completed",
-      genre: "Fiction",
-      format: "Paperback",
-      startDate: "2024-11-01",
-      finishDate: "2024-11-15"
-    },
-    {
-      id: 2,
-      title: "Atomic Habits",
-      author: "James Clear",
-      status: "reading",
-      genre: "Self-Help",
-      format: "E-book",
-      startDate: "2024-12-01",
-      finishDate: ""
-    },
-    {
-      id: 3,
-      title: "Project Hail Mary",
-      author: "Andy Weir",
-      status: "tbr",
-      genre: "Science Fiction",
-      format: "Audiobook",
-      startDate: "",
-      finishDate: ""
-    }
-  ]);
-
-  const [newBook, setNewBook] = useState({
-    title: "",
-    author: "",
-    status: "tbr",
-    genre: "",
-    format: "Paperback",
-    startDate: "",
-    finishDate: ""
-  });
-
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [activeTab, setActiveTab] = useState(null);
-  const [isVisible, setIsVisible] = useState(true);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [readDates, setReadDates] = useState(new Set());
-
-  const toggleReadDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    const newReadDates = new Set(readDates);
-    if (newReadDates.has(dateStr)) {
-      newReadDates.delete(dateStr);
-    } else {
-      newReadDates.add(dateStr);
-    }
-    setReadDates(newReadDates);
-  };
-
-  const tabCounts = useMemo(() => ({
-    reading: books.filter(b => b.status === "reading").length,
-    tbr: books.filter(b => b.status === "tbr").length,
-    completed: books.filter(b => b.status === "completed").length
-  }), [books]);
-
-  const handleTabChange = (tab) => {
-    if (activeTab === tab) {
-      setIsVisible(false);
-      setTimeout(() => {
-        setActiveTab(null);
-      }, 300);
-    } else {
-      setIsVisible(false);
-      setTimeout(() => {
-        setActiveTab(tab);
-        setIsVisible(true);
-      }, 300);
-    }
-  };
-
-  const stats = useMemo(() => {
-    const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-
-    const completed = books.filter(b => b.status === "completed");
-    
-    const yearCount = completed.filter(b => 
-      b.finishDate && new Date(b.finishDate) >= startOfYear
-    ).length;
-
-    const monthCount = completed.filter(b => 
-      b.finishDate && new Date(b.finishDate) >= startOfMonth
-    ).length;
-
-    const weekCount = completed.filter(b => 
-      b.finishDate && new Date(b.finishDate) >= startOfWeek
-    ).length;
-
-    return { yearCount, monthCount, weekCount, totalCompleted: completed.length };
-  }, [books]);
-
-  const addBook = () => {
-    if (!newBook.title || !newBook.author) return;
-    
-    setBooks([...books, { ...newBook, id: Date.now() }]);
-    setNewBook({
-      title: "",
-      author: "",
-      status: "tbr",
-      genre: "",
-      format: "Paperback",
-      startDate: "",
-      finishDate: ""
-    });
-    setShowAddForm(false);
-  };
-
-  const deleteBook = (id) => {
-    setBooks(books.filter(b => b.id !== id));
-  };
-
-  const updateBook = (id, field, value) => {
-    setBooks(books.map(b => b.id === id ? { ...b, [field]: value } : b));
-  };
-
-  const getDaysInMonth = (date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-    
-    return { daysInMonth, startingDayOfWeek, year, month };
-  };
-
-  const hasReadOnDay = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    
-    if (readDates.has(dateStr)) return true;
-    
-    return books.some(book => {
-      if (book.status === "completed" && book.finishDate === dateStr) return true;
-      if (book.status === "reading" && book.startDate) {
-        const start = new Date(book.startDate);
-        const end = book.finishDate ? new Date(book.finishDate) : new Date();
-        return date >= start && date <= end;
-      }
-      return false;
-    });
-  };
-
-  const calculateStreaks = () => {
-    const allDates = new Set();
-    
-    readDates.forEach(dateStr => allDates.add(dateStr));
-    
-    books.forEach(book => {
-      if (book.status === "completed" && book.finishDate) {
-        allDates.add(book.finishDate);
-      }
-      if (book.status === "reading" && book.startDate) {
-        const start = new Date(book.startDate);
-        const end = book.finishDate ? new Date(book.finishDate) : new Date();
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          allDates.add(d.toISOString().split('T')[0]);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Reading Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', 'Nunito', 'Rounded', sans-serif;
         }
-      }
-    });
-    
-    if (allDates.size === 0) return { current: 0, longest: 0 };
-    
-    const sortedDates = Array.from(allDates).sort();
-    let currentStreak = 0;
-    let longestStreak = 0;
-    let tempStreak = 1;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    
-    for (let i = 1; i < sortedDates.length; i++) {
-      const prevDate = new Date(sortedDates[i - 1]);
-      const currDate = new Date(sortedDates[i]);
-      const diffDays = Math.floor((currDate - prevDate) / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 1) {
-        tempStreak++;
-      } else {
-        longestStreak = Math.max(longestStreak, tempStreak);
-        tempStreak = 1;
-      }
-    }
-    longestStreak = Math.max(longestStreak, tempStreak);
-    
-    if (sortedDates.includes(today) || sortedDates.includes(yesterday)) {
-      currentStreak = 1;
-      let checkDate = sortedDates.includes(today) ? today : yesterday;
-      let dateIndex = sortedDates.indexOf(checkDate);
-      
-      for (let i = dateIndex - 1; i >= 0; i--) {
-        const prevDate = new Date(sortedDates[i]);
-        const currDate = new Date(sortedDates[i + 1]);
-        const diffDays = Math.floor((currDate - prevDate) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays === 1) {
-          currentStreak++;
-        } else {
-          break;
-        }
-      }
-    }
-    
-    return { current: currentStreak, longest: longestStreak };
-  };
-
-  const streaks = useMemo(() => calculateStreaks(), [books, readDates]);
-
-  const changeMonth = (increment) => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + increment, 1));
-  };
-
-  const BookCard = ({ book, index }) => (
-    <div 
-      className="bg-white/80 backdrop-blur-sm p-5 rounded-3xl shadow-lg border border-purple-200/50 hover:shadow-2xl hover:scale-105 hover:border-purple-300 transition-all duration-300"
-      style={{
-        animation: 'fadeInUp 0.5s ease-out forwards',
-        animationDelay: `${index * 0.1}s`,
-        opacity: 0
-      }}
-    >
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <h3 className="font-bold text-gray-800 text-lg">{book.title}</h3>
-          <p className="text-sm text-gray-600 mt-1">{book.author}</p>
-        </div>
-        <button
-          onClick={() => deleteBook(book.id)}
-          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-full transition-all duration-200"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
-      
-      <div className="space-y-2 text-sm">
-        <div className="flex gap-2">
-          <span className="text-gray-600 font-medium">Status:</span>
-          <select
-            value={book.status}
-            onChange={(e) => updateBook(book.id, 'status', e.target.value)}
-            className="text-sm border-none bg-transparent focus:outline-none cursor-pointer font-medium text-purple-600"
-          >
-            <option value="tbr">TBR</option>
-            <option value="reading">Reading</option>
-            <option value="completed">Completed</option>
-          </select>
-        </div>
-        
-        <div className="flex gap-2">
-          <span className="text-gray-600 font-medium">Genre:</span>
-          <input
-            type="text"
-            value={book.genre}
-            onChange={(e) => updateBook(book.id, 'genre', e.target.value)}
-            className="flex-1 text-sm border-none bg-transparent focus:outline-none"
-            placeholder="Genre"
-          />
-        </div>
-        
-        <div className="flex gap-2">
-          <span className="text-gray-600 font-medium">Format:</span>
-          <select
-            value={book.format}
-            onChange={(e) => updateBook(book.id, 'format', e.target.value)}
-            className="text-sm border-none bg-transparent focus:outline-none cursor-pointer"
-          >
-            <option value="Paperback">Paperback</option>
-            <option value="Hardcover">Hardcover</option>
-            <option value="E-book">E-book</option>
-            <option value="Audiobook">Audiobook</option>
-          </select>
-        </div>
-
-        {(book.status === "reading" || book.status === "completed") && (
-          <div className="flex gap-2 items-center">
-            <span className="text-gray-600 font-medium">Started:</span>
-            <input
-              type="date"
-              value={book.startDate}
-              onChange={(e) => updateBook(book.id, 'startDate', e.target.value)}
-              className="text-sm border border-purple-200 rounded-xl px-3 py-1 focus:outline-none focus:border-purple-400"
-            />
-          </div>
-        )}
-
-        {book.status === "completed" && (
-          <div className="flex gap-2 items-center">
-            <span className="text-gray-600 font-medium">Finished:</span>
-            <input
-              type="date"
-              value={book.finishDate}
-              onChange={(e) => updateBook(book.id, 'finishDate', e.target.value)}
-              className="text-sm border border-purple-200 rounded-xl px-3 py-1 focus:outline-none focus:border-purple-400"
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen relative overflow-hidden" style={{ fontFamily: "'Quicksand', 'Nunito', 'Rounded', sans-serif" }}>
-      {/* Animated Background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-red-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-6000"></div>
-      </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
         
         @keyframes blob {
-          0%, 100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
+            0%, 100% {
+                transform: translate(0px, 0px) scale(1);
+            }
+            33% {
+                transform: translate(30px, -50px) scale(1.1);
+            }
+            66% {
+                transform: translate(-20px, 20px) scale(0.9);
+            }
         }
         
         @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
         }
         
         @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .animate-blob {
-          animation: blob 7s infinite;
+            animation: blob 7s infinite;
         }
         
         .animation-delay-2000 {
-          animation-delay: 2s;
+            animation-delay: 2s;
         }
         
         .animation-delay-4000 {
-          animation-delay: 4s;
+            animation-delay: 4s;
         }
         
         .animation-delay-6000 {
-          animation-delay: 6s;
+            animation-delay: 6s;
         }
         
         .fade-in {
-          animation: fadeIn 0.3s ease-out;
+            animation: fadeIn 0.3s ease-out;
         }
         
         .slide-down {
-          animation: slideDown 0.4s ease-out;
+            animation: slideDown 0.4s ease-out;
         }
-      `}</style>
-
-      <div className="relative z-10 p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Tabs - First thing on screen */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 fade-in">
-            <div className="relative">
-              <button
-                onClick={() => handleTabChange("reading")}
-                className={`w-full p-6 rounded-2xl font-bold transition-all duration-300 flex flex-col items-center justify-center gap-3 min-h-[140px] ${
-                  activeTab === "reading"
-                    ? "bg-gradient-to-br from-purple-400 to-pink-400 text-white shadow-xl scale-105"
-                    : "bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg hover:scale-102"
-                }`}
-              >
-                <BookOpen size={32} className={activeTab === "reading" ? "text-white" : "text-purple-400"} />
-                <span className="text-lg">Currently Reading</span>
-                <span className={`px-4 py-1 rounded-full text-sm font-bold ${
-                  activeTab === "reading" 
-                    ? "bg-white/30" 
-                    : "bg-purple-100 text-purple-600"
-                }`}>
-                  {tabCounts.reading} {tabCounts.reading === 1 ? 'book' : 'books'}
-                </span>
-              </button>
-              
-              {/* Book List for Currently Reading */}
-              {activeTab === "reading" && (
-                <div className={`mt-4 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-                  <div className="grid grid-cols-1 gap-4">
-                    {books.filter(b => b.status === "reading").map((book, index) => (
-                      <BookCard key={book.id} book={book} index={index} />
-                    ))}
-                    {books.filter(b => b.status === "reading").length === 0 && (
-                      <p className="text-gray-600 italic text-center py-8 font-medium fade-in">No books currently reading</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="relative">
-              <button
-                onClick={() => handleTabChange("tbr")}
-                className={`w-full p-6 rounded-2xl font-bold transition-all duration-300 flex flex-col items-center justify-center gap-3 min-h-[140px] ${
-                  activeTab === "tbr"
-                    ? "bg-gradient-to-br from-blue-400 to-purple-400 text-white shadow-xl scale-105"
-                    : "bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg hover:scale-102"
-                }`}
-              >
-                <Calendar size={32} className={activeTab === "tbr" ? "text-white" : "text-blue-400"} />
-                <span className="text-lg">To Be Read</span>
-                <span className={`px-4 py-1 rounded-full text-sm font-bold ${
-                  activeTab === "tbr" 
-                    ? "bg-white/30" 
-                    : "bg-blue-100 text-blue-600"
-                }`}>
-                  {tabCounts.tbr} {tabCounts.tbr === 1 ? 'book' : 'books'}
-                </span>
-              </button>
-              
-              {/* Book List for TBR */}
-              {activeTab === "tbr" && (
-                <div className={`mt-4 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-                  <div className="grid grid-cols-1 gap-4">
-                    {books.filter(b => b.status === "tbr").map((book, index) => (
-                      <BookCard key={book.id} book={book} index={index} />
-                    ))}
-                    {books.filter(b => b.status === "tbr").length === 0 && (
-                      <p className="text-gray-600 italic text-center py-8 font-medium fade-in">No books in TBR list</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="relative">
-              <button
-                onClick={() => handleTabChange("completed")}
-                className={`w-full p-6 rounded-2xl font-bold transition-all duration-300 flex flex-col items-center justify-center gap-3 min-h-[140px] ${
-                  activeTab === "completed"
-                    ? "bg-gradient-to-br from-pink-400 to-red-400 text-white shadow-xl scale-105"
-                    : "bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg hover:scale-102"
-                }`}
-              >
-                <TrendingUp size={32} className={activeTab === "completed" ? "text-white" : "text-pink-400"} />
-                <span className="text-lg">Completed Books</span>
-                <span className={`px-4 py-1 rounded-full text-sm font-bold ${
-                  activeTab === "completed" 
-                    ? "bg-white/30" 
-                    : "bg-pink-100 text-pink-600"
-                }`}>
-                  {tabCounts.completed} {tabCounts.completed === 1 ? 'book' : 'books'}
-                </span>
-              </button>
-              
-              {/* Book List for Completed */}
-              {activeTab === "completed" && (
-                <div className={`mt-4 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-                  <div className="grid grid-cols-1 gap-4">
-                    {books.filter(b => b.status === "completed").map((book, index) => (
-                      <BookCard key={book.id} book={book} index={index} />
-                    ))}
-                    {books.filter(b => b.status === "completed").length === 0 && (
-                      <p className="text-gray-600 italic text-center py-8 font-medium fade-in">No completed books yet</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between mb-8 slide-down">
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-purple-400 to-pink-400 p-3 rounded-2xl shadow-lg">
-                <BookOpen size={36} className="text-white" />
-              </div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
-                My Reading Journey
-              </h1>
-            </div>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-2 bg-gradient-to-r from-purple-400 to-pink-400 text-white px-6 py-3 rounded-full hover:shadow-xl hover:scale-105 transition-all duration-300 font-semibold"
-            >
-              <Plus size={20} />
-              Add Book
-            </button>
-          </div>
-
-          {/* Add Book Form */}
-          {showAddForm && (
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg mb-8 hover:shadow-2xl transition-all duration-300 slide-down">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">Add New Book</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <input
-                  type="text"
-                  placeholder="Title"
-                  value={newBook.title}
-                  onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
-                  className="border-2 border-purple-200 rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400 transition-colors duration-200"
-                />
-                <input
-                  type="text"
-                  placeholder="Author"
-                  value={newBook.author}
-                  onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
-                  className="border-2 border-purple-200 rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400 transition-colors duration-200"
-                />
-                <input
-                  type="text"
-                  placeholder="Genre"
-                  value={newBook.genre}
-                  onChange={(e) => setNewBook({ ...newBook, genre: e.target.value })}
-                  className="border-2 border-purple-200 rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400 transition-colors duration-200"
-                />
-                <select
-                  value={newBook.format}
-                  onChange={(e) => setNewBook({ ...newBook, format: e.target.value })}
-                  className="border-2 border-purple-200 rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400 transition-colors duration-200"
-                >
-                  <option value="Paperback">Paperback</option>
-                  <option value="Hardcover">Hardcover</option>
-                  <option value="E-book">E-book</option>
-                  <option value="Audiobook">Audiobook</option>
-                </select>
-              </div>
-              <button
-                onClick={addBook}
-                className="bg-gradient-to-r from-purple-400 to-pink-400 text-white px-8 py-3 rounded-full hover:shadow-xl hover:scale-105 transition-all duration-300 font-semibold"
-              >
-                Add Book
-              </button>
-            </div>
-          )}
-
-          {/* Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg border-l-4 border-purple-400 hover:shadow-2xl hover:scale-105 transition-all duration-300"
-              style={{ animation: 'fadeInUp 0.5s ease-out forwards', animationDelay: '0.1s', opacity: 0 }}>
-              <div className="flex flex-col items-center text-center gap-2">
-                <TrendingUp className="text-purple-400" size={32} />
-                <p className="text-gray-600 text-sm font-medium">This Year</p>
-                <p className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-purple-700 bg-clip-text text-transparent">{stats.yearCount}</p>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg border-l-4 border-blue-400 hover:shadow-2xl hover:scale-105 transition-all duration-300"
-              style={{ animation: 'fadeInUp 0.5s ease-out forwards', animationDelay: '0.2s', opacity: 0 }}>
-              <div className="flex flex-col items-center text-center gap-2">
-                <Calendar className="text-blue-400" size={32} />
-                <p className="text-gray-600 text-sm font-medium">This Month</p>
-                <p className="text-4xl font-bold bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent">{stats.monthCount}</p>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg border-l-4 border-pink-400 hover:shadow-2xl hover:scale-105 transition-all duration-300"
-              style={{ animation: 'fadeInUp 0.5s ease-out forwards', animationDelay: '0.3s', opacity: 0 }}>
-              <div className="flex flex-col items-center text-center gap-2">
-                <BookOpen className="text-pink-400" size={32} />
-                <p className="text-gray-600 text-sm font-medium">This Week</p>
-                <p className="text-4xl font-bold bg-gradient-to-r from-pink-500 to-pink-700 bg-clip-text text-transparent">{stats.weekCount}</p>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg border-l-4 border-red-400 hover:shadow-2xl hover:scale-105 transition-all duration-300 md:col-span-1"
-              style={{ animation: 'fadeInUp 0.5s ease-out forwards', animationDelay: '0.4s', opacity: 0 }}>
-              <div className="flex flex-col items-center text-center gap-2">
-                <BookOpen className="text-red-400" size={32} />
-                <p className="text-gray-600 text-sm font-medium">Total Completed</p>
-                <p className="text-4xl font-bold bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent">{stats.totalCompleted}</p>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg border-l-4 border-orange-400 hover:shadow-2xl hover:scale-105 transition-all duration-300"
-              style={{ animation: 'fadeInUp 0.5s ease-out forwards', animationDelay: '0.5s', opacity: 0 }}>
-              <div className="flex flex-col items-center text-center gap-2">
-                <svg className="text-orange-400" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <p className="text-gray-600 text-sm font-medium">Current Streak</p>
-                <p className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">{streaks.current}</p>
-                <p className="text-xs text-gray-500">{streaks.current === 1 ? 'day' : 'days'}</p>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg border-l-4 border-emerald-400 hover:shadow-2xl hover:scale-105 transition-all duration-300"
-              style={{ animation: 'fadeInUp 0.5s ease-out forwards', animationDelay: '0.6s', opacity: 0 }}>
-              <div className="flex flex-col items-center text-center gap-2">
-                <svg className="text-emerald-400" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
-                <p className="text-gray-600 text-sm font-medium">Longest Streak</p>
-                <p className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent">{streaks.longest}</p>
-                <p className="text-xs text-gray-500">{streaks.longest === 1 ? 'day' : 'days'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Reading Calendar */}
-          <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg mb-8 hover:shadow-2xl transition-all duration-300 fade-in">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Reading Calendar</h2>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => changeMonth(-1)}
-                  className="p-2 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <span className="font-bold text-gray-800 min-w-[150px] text-center">
-                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </span>
-                <button
-                  onClick={() => changeMonth(1)}
-                  className="p-2 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-7 gap-2">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center font-bold text-gray-600 text-sm py-2">
-                  {day}
-                </div>
-              ))}
-              
-              {(() => {
-                const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentMonth);
-                const days = [];
-                
-                for (let i = 0; i < startingDayOfWeek; i++) {
-                  days.push(<div key={`empty-${i}`} className="aspect-square"></div>);
-                }
-                
-                for (let day = 1; day <= daysInMonth; day++) {
-                  const date = new Date(year, month, day);
-                  const hasRead = hasReadOnDay(date);
-                  const isToday = new Date().toDateString() === date.toDateString();
-                  
-                  days.push(
-                    <button
-                      key={day}
-                      onClick={() => toggleReadDate(date)}
-                      className={`aspect-square rounded-lg flex items-center justify-center text-sm font-semibold transition-all duration-300 cursor-pointer ${
-                        isToday
-                          ? 'bg-gradient-to-br from-purple-400 to-pink-400 text-white ring-2 ring-purple-300'
-                          : hasRead
-                          ? 'bg-gradient-to-br from-green-400 to-emerald-400 text-white hover:scale-110 hover:shadow-lg'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-105'
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  );
-                }
-                
-                return days;
-              })()}
-            </div>
-            
-            <div className="flex items-center justify-center gap-6 mt-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-gradient-to-br from-green-400 to-emerald-400"></div>
-                <span className="text-gray-600 font-medium">Read (Click to toggle)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-gradient-to-br from-purple-400 to-pink-400"></div>
-                <span className="text-gray-600 font-medium">Today</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-gray-100"></div>
-                <span className="text-gray-600 font-medium">No Reading</span>
-              </div>
-            </div>
-          </div>
-
-          {/* All Books List */}
-          <div className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg mb-8 hover:shadow-2xl transition-all duration-300 fade-in">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">All Books</h2>
-            {books.length === 0 ? (
-              <p className="text-gray-600 italic text-center py-4">No books added yet</p>
-            ) : (
-              <div className="space-y-2">
-                {books.map((book, index) => (
-                  <div 
-                    key={book.id} 
-                    className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50 hover:shadow-md transition-all duration-300"
-                    style={{
-                      animation: 'fadeInUp 0.4s ease-out forwards',
-                      animationDelay: `${index * 0.05}s`,
-                      opacity: 0
-                    }}
-                  >
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-800">{book.title}</h3>
-                      <p className="text-sm text-gray-600">{book.author}</p>
-                    </div>
-                    <span className={`px-4 py-2 rounded-full text-sm font-bold ${
-                      book.status === "reading" 
-                        ? "bg-gradient-to-r from-purple-400 to-pink-400 text-white" 
-                        : book.status === "tbr"
-                        ? "bg-gradient-to-r from-blue-400 to-purple-400 text-white"
-                        : "bg-gradient-to-r from-pink-400 to-red-400 text-white"
-                    }`}>
-                      {book.status === "reading" ? "Currently Reading" : book.status === "tbr" ? "To Be Read" : "Completed"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+    </style>
+</head>
+<body class="min-h-screen relative overflow-hidden">
+    <!-- Animated Background -->
+    <div class="fixed inset-0 bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100">
+        <div class="absolute top-0 left-0 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div class="absolute top-0 right-0 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+        <div class="absolute bottom-0 left-1/2 w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+        <div class="absolute bottom-0 right-0 w-96 h-96 bg-red-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-6000"></div>
     </div>
-  );
-};
 
-export default BookDashboard;
+    <div class="relative z-10 p-6">
+        <div class="max-w-7xl mx-auto">
+            <!-- Tabs -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 fade-in" id="categoryTabs">
+                <div class="relative">
+                    <button onclick="toggleTab('reading')" id="readingTab" class="w-full p-6 rounded-2xl font-bold transition-all duration-300 flex flex-col items-center justify-center gap-3 min-h-[140px] bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg">
+                        <svg class="text-purple-400" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                        <span class="text-lg">Currently Reading</span>
+                        <span class="px-4 py-1 rounded-full text-sm font-bold bg-purple-100 text-purple-600" id="readingCount">0 books</span>
+                    </button>
+                    <div id="readingList" class="mt-4 hidden"></div>
+                </div>
+                
+                <div class="relative">
+                    <button onclick="toggleTab('tbr')" id="tbrTab" class="w-full p-6 rounded-2xl font-bold transition-all duration-300 flex flex-col items-center justify-center gap-3 min-h-[140px] bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg">
+                        <svg class="text-blue-400" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="text-lg">To Be Read</span>
+                        <span class="px-4 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-600" id="tbrCount">0 books</span>
+                    </button>
+                    <div id="tbrList" class="mt-4 hidden"></div>
+                </div>
+                
+                <div class="relative">
+                    <button onclick="toggleTab('completed')" id="completedTab" class="w-full p-6 rounded-2xl font-bold transition-all duration-300 flex flex-col items-center justify-center gap-3 min-h-[140px] bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg">
+                        <svg class="text-pink-400" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        <span class="text-lg">Completed Books</span>
+                        <span class="px-4 py-1 rounded-full text-sm font-bold bg-pink-100 text-pink-600" id="completedCount">0 books</span>
+                    </button>
+                    <div id="completedList" class="mt-4 hidden"></div>
+                </div>
+            </div>
+
+            <!-- Title and Add Book Button -->
+            <div class="flex items-center justify-between mb-8 slide-down">
+                <div class="flex items-center gap-3">
+                    <div class="bg-gradient-to-br from-purple-400 to-pink-400 p-3 rounded-2xl shadow-lg">
+                        <svg class="text-white" width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                    </div>
+                    <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
+                        My Reading Journey
+                    </h1>
+                </div>
+                <button onclick="toggleAddForm()" class="flex items-center gap-2 bg-gradient-to-r from-purple-400 to-pink-400 text-white px-6 py-3 rounded-full hover:shadow-xl hover:scale-105 transition-all duration-300 font-semibold">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Add Book
+                </button>
+            </div>
+
+            <!-- Add Book Form -->
+            <div id="addBookForm" class="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg mb-8 hidden slide-down">
+                <h2 class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">Add New Book</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <input type="text" id="bookTitle" placeholder="Title" class="border-2 border-purple-200 rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400">
+                    <input type="text" id="bookAuthor" placeholder="Author" class="border-2 border-purple-200 rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400">
+                    <input type="text" id="bookGenre" placeholder="Genre" class="border-2 border-purple-200 rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400">
+                    <select id="bookFormat" class="border-2 border-purple-200 rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400">
+                        <option value="Paperback">Paperback</option>
+                        <option value="Hardcover">Hardcover</option>
+                        <option value="E-book">E-book</option>
+                        <option value="Audiobook">Audiobook</option>
+                    </select>
+                </div>
+                <button onclick="addBook()" class="bg-gradient-to-r from-purple-400 to-pink-400 text-white px-8 py-3 rounded-full hover:shadow-xl hover:scale-105 transition-all duration-300 font-semibold">
+                    Add Book
+                </button>
+            </div>
+
+            <!-- Stats Section -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8" id="statsSection"></div>
+
+            <!-- Reading Calendar -->
+            <div class="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg mb-8 hover:shadow-2xl transition-all duration-300 fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Reading Calendar</h2>
+                    <div class="flex items-center gap-3">
+                        <button onclick="changeMonth(-1)" class="p-2 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors">
+                            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                        </button>
+                        <span id="currentMonthLabel" class="font-bold text-gray-800 min-w-[150px] text-center"></span>
+                        <button onclick="changeMonth(1)" class="p-2 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors">
+                            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="calendar" class="grid grid-cols-7 gap-2"></div>
+                
+                <div class="flex items-center justify-center gap-6 mt-6 text-sm">
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 rounded bg-gradient-to-br from-green-400 to-emerald-400"></div>
+                        <span class="text-gray-600 font-medium">Read (Click to toggle)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 rounded bg-gradient-to-br from-purple-400 to-pink-400"></div>
+                        <span class="text-gray-600 font-medium">Today</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 rounded bg-gray-100"></div>
+                        <span class="text-gray-600 font-medium">No Reading</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- All Books List -->
+            <div class="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg mb-8 hover:shadow-2xl transition-all duration-300 fade-in">
+                <h2 class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">All Books</h2>
+                <div id="allBooksList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let books = [
+            { id: 1, title: "The Midnight Library", author: "Matt Haig", status: "completed", genre: "Fiction", format: "Paperback", startDate: "2024-11-01", finishDate: "2024-11-15" },
+            { id: 2, title: "Atomic Habits", author: "James Clear", status: "reading", genre: "Self-Help", format: "E-book", startDate: "2024-12-01", finishDate: "" },
+            { id: 3, title: "Project Hail Mary", author: "Andy Weir", status: "tbr", genre: "Science Fiction", format: "Audiobook", startDate: "", finishDate: "" }
+        ];
+        
+        let readDates = new Set();
+        let currentMonth = new Date();
+        let activeTab = null;
+
+        function toggleAddForm() {
+            const form = document.getElementById('addBookForm');
+            form.classList.toggle('hidden');
+        }
+
+        function addBook() {
+            const title = document.getElementById('bookTitle').value;
+            const author = document.getElementById('bookAuthor').value;
+            const genre = document.getElementById('bookGenre').value;
+            const format = document.getElementById('bookFormat').value;
+
+            if (!title || !author) return;
+
+            books.push({
+                id: Date.now(),
+                title, author, genre, format,
+                status: 'tbr',
+                startDate: '',
+                finishDate: ''
+            });
+
+            document.getElementById('bookTitle').value = '';
+            document.getElementById('bookAuthor').value = '';
+            document.getElementById('bookGenre').value = '';
+            toggleAddForm();
+            renderAll();
+        }
+
+        function deleteBook(id) {
+            books = books.filter(b => b.id !== id);
+            renderAll();
+        }
+
+        function updateBook(id, field, value) {
+            const book = books.find(b => b.id === id);
+            if (book) book[field] = value;
+            renderAll();
+        }
+
+        function toggleTab(tab) {
+            if (activeTab === tab) {
+                activeTab = null;
+            } else {
+                activeTab = tab;
+            }
+            renderTabs();
+        }
+
+        function renderTabs() {
+            const tabs = ['reading', 'tbr', 'completed'];
+            tabs.forEach(tab => {
+                const tabEl = document.getElementById(`${tab}Tab`);
+                const listEl = document.getElementById(`${tab}List`);
+                
+                if (activeTab === tab) {
+                    tabEl.className = 'w-full p-6 rounded-2xl font-bold transition-all duration-300 flex flex-col items-center justify-center gap-3 min-h-[140px] bg-gradient-to-br text-white shadow-xl scale-105 ' + 
+                        (tab === 'reading' ? 'from-purple-400 to-pink-400' : tab === 'tbr' ? 'from-blue-400 to-purple-400' : 'from-pink-400 to-red-400');
+                    listEl.classList.remove('hidden');
+                    
+                    const filteredBooks = books.filter(b => b.status === tab);
+                    listEl.innerHTML = filteredBooks.length === 0 
+                        ? '<p class="text-gray-600 italic text-center py-8 font-medium">No books in this category</p>'
+                        : filteredBooks.map((book, i) => renderBookCard(book, i)).join('');
+                } else {
+                    tabEl.className = 'w-full p-6 rounded-2xl font-bold transition-all duration-300 flex flex-col items-center justify-center gap-3 min-h-[140px] bg-white/80 text-gray-700 hover:bg-white hover:shadow-lg';
+                    listEl.classList.add('hidden');
+                }
+            });
+            updateCounts();
+        }
+
+        function updateCounts() {
+            document.getElementById('readingCount').textContent = `${books.filter(b => b.status === 'reading').length} ${books.filter(b => b.status === 'reading').length === 1 ? 'book' : 'books'}`;
+            document.getElementById('tbrCount').textContent = `${books.filter(b => b.status === 'tbr').length} ${books.filter(b => b.status === 'tbr').length === 1 ? 'book' : 'books'}`;
+            document.getElementById('completedCount').textContent = `${books.filter(b => b.status === 'completed').length} ${books.filter(b => b.status === 'completed').length === 1 ? 'book' : 'books'}`;
+        }
+
+        function renderBookCard(book, index) {
+            const statusOptions = ['tbr', 'reading', 'completed'];
+            return `
+                <div class="bg-white/80 backdrop-blur-sm p-5 rounded-3xl shadow-lg border border-purple-200/50 hover:shadow-2xl hover:border-purple-300 transition-all duration-300">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 text-lg">${book.title}</h3>
+                            <p class="text-sm text-gray-600 mt-1">${book.author}</p>
+                        </div>
+                        <button onclick="deleteBook(${book.id})" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-full transition-all duration-200">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex gap-2">
+                            <span class="text-gray-600 font-medium">Status:</span>
+                            <select onchange="updateBook(${book.id}, 'status', this.value)" class="text-sm border-none bg-transparent focus:outline-none cursor-pointer font-medium text-purple-600">
+                                ${statusOptions.map(s => `<option value="${s}" ${book.status === s ? 'selected' : ''}>${s === 'tbr' ? 'TBR' : s === 'reading' ? 'Reading' : 'Completed'}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="flex gap-2">
+                            <span class="text-gray-600 font-medium">Genre:</span>
+                            <input type="text" value="${book.genre}" onchange="updateBook(${book.id}, 'genre', this.value)" class="flex-1 text-sm border-none bg-transparent focus:outline-none" placeholder="Genre">
+                        </div>
+                        ${book.status !== 'tbr' ? `
+                        <div class="flex gap-2 items-center">
+                            <span class="text-gray-600 font-medium">Started:</span>
+                            <input type="date" value="${book.startDate}" onchange="updateBook(${book.id}, 'startDate', this.value)" class="text-sm border border-purple-200 rounded-xl px-3 py-1 focus:outline-none focus:border-purple-400">
+                        </div>
+                        ` : ''}
+                        ${book.status === 'completed' ? `
+                        <div class="flex gap-2 items-center">
+                            <span class="text-gray-600 font-medium">Finished:</span>
+                            <input type="date" value="${book.finishDate}" onchange="updateBook(${book.id}, 'finishDate', this.value)" class="text-sm border border-purple-200 rounded-xl px-3 py-1 focus:outline-none focus:border-purple-400">
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStats() {
+            const now = new Date();
+            const completed = books.filter(b => b.status === 'completed');
+            
+            const yearCount = completed.filter(b => b.finishDate && new Date(b.finishDate) >= new Date(now.getFullYear(), 0, 1)).length;
+            const monthCount = completed.filter(b => b.finishDate && new Date(b.finishDate) >= new Date(now.getFullYear(), now.getMonth(), 1)).length;
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - now.getDay());
+            const weekCount = completed.filter(b => b.finishDate && new Date(b.finishDate) >= weekStart).length;
+
+            const streaks = calculateStreaks();
+
+            const stats = [
+                { label: 'This Year', value: yearCount, color: 'purple', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+                { label: 'This Month', value: monthCount, color: 'blue', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+                { label: 'This Week', value: weekCount, color: 'pink', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+                { label: 'Total Completed', value: completed.length, color: 'red', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+                { label: 'Current Streak', value: streaks.current, color: 'orange', icon: 'M13 10V3L4 14h7v7l9-11h-7z', suffix: streaks.current === 1 ? 'day' : 'days' },
+                { label: 'Longest Streak', value: streaks.longest, color: 'emerald', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z', suffix: streaks.longest === 1 ? 'day' : 'days' }
+            ];
+
+            document.getElementById('statsSection').innerHTML = stats.map((stat, i) => `
+                <div class="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-lg border-l-4 border-${stat.color}-400 hover:shadow-2xl hover:scale-105 transition-all duration-300" style="animation: fadeInUp 0.5s ease-out forwards; animation-delay: ${i * 0.1}s; opacity: 0;">
+                    <div class="flex flex-col items-center text-center gap-2">
+                        <svg class="text-${stat.color}-400" width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${stat.icon}"></path>
+                        </svg>
+                        <p class="text-gray-600 text-sm font-medium">${stat.label}</p>
+                        <p class="text-4xl font-bold bg-gradient-to-r from-${stat.color}-400 to-${stat.color}-600 bg-clip-text text-transparent">${stat.value}</p>
+                        ${stat.suffix ? `<p class="text-xs text-gray-500">${stat.suffix}</p>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function calculateStreaks() {
+            const allDates = new Set([...readDates]);
+            
+            books.forEach(book => {
+                if (book.status === 'completed' && book.finishDate) allDates.add(book.finishDate);
+                if (book.status === 'reading' && book.startDate) {
+                    const start = new Date(book.startDate);
+                    const end = book.finishDate ? new Date(book.finishDate) : new Date();
+                    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                        allDates.add(d.toISOString().split('T')[0]);
+                    }
+                }
+            });
+            
+            if (allDates.size === 0) return { current: 0, longest: 0 };
+            
+            const sortedDates = Array.from(allDates).sort();
+            let currentStreak = 0, longestStreak = 0, tempStreak = 1;
+            const today = new Date().toISOString().split('T')[0];
+            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+            
+            for (let i = 1; i < sortedDates.length; i++) {
+                const diffDays = Math.floor((new Date(sortedDates[i]) - new Date(sortedDates[i - 1])) / 86400000);
+                if (diffDays === 1) tempStreak++;
+                else { longestStreak = Math.max(longestStreak, tempStreak); tempStreak = 1; }
+            }
+            longestStreak = Math.max(longestStreak, tempStreak);
+            
+            if (sortedDates.includes
