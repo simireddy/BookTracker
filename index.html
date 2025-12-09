@@ -802,16 +802,8 @@
         function calculateStreaks() {
             const allDates = new Set([...readDates]);
             
-            books.forEach(book => {
-                if (book.status === 'completed' && book.finishDate) allDates.add(book.finishDate);
-                if (book.status === 'reading' && book.startDate) {
-                    const start = new Date(book.startDate);
-                    const end = book.finishDate ? new Date(book.finishDate) : new Date();
-                    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                        allDates.add(d.toISOString().split('T')[0]);
-                    }
-                }
-            });
+            // Only add dates from manually marked readDates
+            // Don't include book dates to start from 0
             
             if (allDates.size === 0) return { current: 0, longest: 0 };
             
@@ -820,13 +812,19 @@
             const today = new Date().toISOString().split('T')[0];
             const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
             
+            // Calculate longest streak
             for (let i = 1; i < sortedDates.length; i++) {
                 const diffDays = Math.floor((new Date(sortedDates[i]) - new Date(sortedDates[i - 1])) / 86400000);
-                if (diffDays === 1) tempStreak++;
-                else { longestStreak = Math.max(longestStreak, tempStreak); tempStreak = 1; }
+                if (diffDays === 1) {
+                    tempStreak++;
+                } else {
+                    longestStreak = Math.max(longestStreak, tempStreak);
+                    tempStreak = 1;
+                }
             }
             longestStreak = Math.max(longestStreak, tempStreak);
             
+            // Calculate current streak
             if (sortedDates.includes(today) || sortedDates.includes(yesterday)) {
                 currentStreak = 1;
                 let checkDate = sortedDates.includes(today) ? today : yesterday;
@@ -859,7 +857,12 @@
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(year, month, day);
                 const dateStr = date.toISOString().split('T')[0];
-                const hasRead = readDates.has(dateStr) || books.some(book => {
+                
+                // Check if manually marked as read
+                const hasRead = readDates.has(dateStr);
+                
+                // Check if from book activity (shows green but doesn't affect streak)
+                const hasBookActivity = books.some(book => {
                     if (book.status === 'completed' && book.finishDate === dateStr) return true;
                     if (book.status === 'reading' && book.startDate) {
                         const start = new Date(book.startDate);
@@ -868,10 +871,14 @@
                     }
                     return false;
                 });
+                
                 const isToday = new Date().toDateString() === date.toDateString();
                 
+                // Show green if manually marked OR has book activity
+                const showAsRead = hasRead || hasBookActivity;
+                
                 html += `<button onclick="toggleReadDate('${dateStr}')" class="calendar-day ${
-                    isToday ? 'today' : hasRead ? 'read' : 'empty'
+                    isToday ? 'today' : showAsRead ? 'read' : 'empty'
                 }">${day}</button>`;
             }
             
@@ -879,8 +886,11 @@
         }
 
         function toggleReadDate(dateStr) {
-            if (readDates.has(dateStr)) readDates.delete(dateStr);
-            else readDates.add(dateStr);
+            if (readDates.has(dateStr)) {
+                readDates.delete(dateStr);
+            } else {
+                readDates.add(dateStr);
+            }
             renderAll();
         }
 
