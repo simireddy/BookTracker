@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Reading Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -562,12 +563,39 @@
                 </div>
                 <h1 class="title">My Reading Journey</h1>
             </div>
-            <button onclick="toggleAddForm()" class="btn btn-primary">
-                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button id="syncBtn" onclick="syncNow()" class="btn" style="background: linear-gradient(to right, #60a5fa, #c084fc); color: white; padding: 0.75rem 1.5rem;">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span id="syncStatus">Sync</span>
+                </button>
+                <button onclick="toggleAddForm()" class="btn btn-primary">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Add Book
+                </button>
+            </div>
+        </div>
+
+        <!-- Supabase Setup Banner -->
+        <div id="setupBanner" class="card mb-8" style="background: linear-gradient(to right, #fef3c7, #fed7aa); border-left: 4px solid #f59e0b;">
+            <div class="flex items-center gap-3" style="flex-wrap: wrap;">
+                <svg style="color: #f59e0b; min-width: 24px;" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                Add Book
-            </button>
+                <div style="flex: 1;">
+                    <h3 class="font-bold text-gray-800">Supabase Setup Required</h3>
+                    <p class="text-sm text-gray-600 mt-1">Enter your Supabase credentials to enable cloud sync across devices.</p>
+                    <div class="grid grid-cols-1 gap-3 mt-3" style="max-width: 600px;">
+                        <input type="text" id="supabaseUrl" placeholder="Supabase URL (https://xxxxx.supabase.co)" class="input text-sm">
+                        <input type="text" id="supabaseKey" placeholder="Supabase Anon Key" class="input text-sm">
+                        <input type="text" id="userId" placeholder="Your Unique User ID (e.g., your email or name)" class="input text-sm">
+                        <button onclick="saveSupabaseConfig()" class="btn btn-primary" style="width: fit-content;">Save & Connect</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Add Book Form -->
@@ -635,15 +663,179 @@
     </div>
 
     <script>
-        let books = [
+        // Supabase configuration
+        let supabase = null;
+        let userId = localStorage.getItem('readingDashboard_userId') || '';
+        
+        // Initialize Supabase if credentials exist
+        const storedUrl = localStorage.getItem('readingDashboard_supabaseUrl');
+        const storedKey = localStorage.getItem('readingDashboard_supabaseKey');
+        
+        if (storedUrl && storedKey && userId) {
+            try {
+                supabase = window.supabase.createClient(storedUrl, storedKey);
+                document.getElementById('setupBanner').style.display = 'none';
+            } catch (e) {
+                console.error('Supabase init error:', e);
+            }
+        }
+
+        // Load data from localStorage or use defaults
+        let books = JSON.parse(localStorage.getItem('readingDashboard_books')) || [
             { id: 1, title: "The Midnight Library", author: "Matt Haig", status: "completed", genre: "Fiction", format: "Paperback", startDate: "2024-11-01", finishDate: "2024-11-15" },
             { id: 2, title: "Atomic Habits", author: "James Clear", status: "reading", genre: "Self-Help", format: "E-book", startDate: "2024-12-01", finishDate: "" },
             { id: 3, title: "Project Hail Mary", author: "Andy Weir", status: "tbr", genre: "Science Fiction", format: "Audiobook", startDate: "", finishDate: "" }
         ];
         
-        let readDates = new Set();
+        let readDates = new Set(JSON.parse(localStorage.getItem('readingDashboard_readDates')) || []);
         let currentMonth = new Date();
         let activeTab = null;
+        let isSyncing = false;
+
+        // Save Supabase configuration
+        function saveSupabaseConfig() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            const user = document.getElementById('userId').value.trim();
+
+            if (!url || !key || !user) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            try {
+                supabase = window.supabase.createClient(url, key);
+                userId = user;
+                
+                localStorage.setItem('readingDashboard_supabaseUrl', url);
+                localStorage.setItem('readingDashboard_supabaseKey', key);
+                localStorage.setItem('readingDashboard_userId', user);
+                
+                document.getElementById('setupBanner').style.display = 'none';
+                
+                // Initial sync
+                syncNow();
+            } catch (e) {
+                alert('Error connecting to Supabase: ' + e.message);
+            }
+        }
+
+        // Sync data to Supabase
+        async function syncToCloud() {
+            if (!supabase || !userId || isSyncing) return;
+            
+            try {
+                const { data, error } = await supabase
+                    .from('reading_data')
+                    .upsert({
+                        user_id: userId,
+                        books: books,
+                        read_dates: [...readDates],
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'user_id'
+                    });
+
+                if (error) throw error;
+                return true;
+            } catch (e) {
+                console.error('Sync to cloud error:', e);
+                return false;
+            }
+        }
+
+        // Load data from Supabase
+        async function syncFromCloud() {
+            if (!supabase || !userId || isSyncing) return;
+            
+            try {
+                const { data, error } = await supabase
+                    .from('reading_data')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .single();
+
+                if (error) {
+                    if (error.code === 'PGRST116') {
+                        // No data found, sync current data to cloud
+                        await syncToCloud();
+                        return true;
+                    }
+                    throw error;
+                }
+
+                if (data) {
+                    books = data.books || books;
+                    readDates = new Set(data.read_dates || []);
+                    saveDataLocally();
+                    renderAll();
+                    return true;
+                }
+            } catch (e) {
+                console.error('Sync from cloud error:', e);
+                return false;
+            }
+        }
+
+        // Manual sync button
+        async function syncNow() {
+            if (!supabase || !userId) {
+                alert('Please configure Supabase first');
+                return;
+            }
+
+            if (isSyncing) return;
+            
+            isSyncing = true;
+            const syncBtn = document.getElementById('syncStatus');
+            const originalText = syncBtn.textContent;
+            syncBtn.textContent = 'Syncing...';
+
+            try {
+                // First, get cloud data
+                const cloudSuccess = await syncFromCloud();
+                
+                // Then push local changes
+                if (cloudSuccess) {
+                    await syncToCloud();
+                    syncBtn.textContent = 'Synced ✓';
+                    setTimeout(() => {
+                        syncBtn.textContent = originalText;
+                    }, 2000);
+                } else {
+                    syncBtn.textContent = 'Sync Failed';
+                    setTimeout(() => {
+                        syncBtn.textContent = originalText;
+                    }, 2000);
+                }
+            } catch (e) {
+                syncBtn.textContent = 'Sync Failed';
+                setTimeout(() => {
+                    syncBtn.textContent = originalText;
+                }, 2000);
+            } finally {
+                isSyncing = false;
+            }
+        }
+
+        // Auto-sync when data changes
+        async function saveData() {
+            saveDataLocally();
+            if (supabase && userId) {
+                await syncToCloud();
+            }
+        }
+
+        // Save to localStorage
+        function saveDataLocally() {
+            localStorage.setItem('readingDashboard_books', JSON.stringify(books));
+            localStorage.setItem('readingDashboard_readDates', JSON.stringify([...readDates]));
+        }
+
+        // Load from cloud on page load
+        if (supabase && userId) {
+            syncFromCloud();
+        }
 
         function toggleAddForm() {
             const form = document.getElementById('addBookForm');
@@ -670,17 +862,20 @@
             document.getElementById('bookAuthor').value = '';
             document.getElementById('bookGenre').value = '';
             toggleAddForm();
+            saveData();
             renderAll();
         }
 
         function deleteBook(id) {
             books = books.filter(b => b.id !== id);
+            saveData();
             renderAll();
         }
 
         function updateBook(id, field, value) {
             const book = books.find(b => b.id === id);
             if (book) book[field] = value;
+            saveData();
             renderAll();
         }
 
@@ -891,6 +1086,7 @@
             } else {
                 readDates.add(dateStr);
             }
+            saveData();
             renderAll();
         }
 
